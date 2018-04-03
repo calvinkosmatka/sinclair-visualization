@@ -39,29 +39,51 @@
   margin: 0;
 }
 
+#slider {
+	position:absolute;
+	top: 100px;
+	left:50px;
+	width: 200px;
+}
+#header {
+	position:absolute;
+	top:200px;
+	left:50px;
+	width:200px;
+}
+#header text p{
+	font-family: Arial, Helvetica;
+	font-size: 24px;
+	margin:0;
+}
+
 </style>
 </head>
 <body>
 <div id="textbox"></div>
-<script src="http://d3js.org/d3.v3.js"></script>
+<div id="header"></div>
+</br></br></br></br>
+<input id="slider" type="range" style="margin:auto" step="1">
+<script src="http://d3js.org/d3.v5.js"></script>
+<script src="https://d3js.org/d3-queue.v3.min.js"></script>
+<script src="https://d3js.org/d3-request.v1.min.js"></script>
 <script src="http://d3js.org/topojson.v1.min.js"></script>
 <script>
 var width = 960,
     height = 500;
 // sets the type of view
-var projection = d3.geo.albersUsa()
+var projection = d3.geoAlbersUsa()
     .scale(1070) // size, bigger is bigger
     .translate([width / 2, height / 2]);
 
 //creates a new geographic path generator
-var path = d3.geo.path().projection(projection);
-var xScale = d3.scale.linear()
+var path = d3.geoPath().projection(projection);
+var xScale = d3.scaleLinear()
     .domain([0, 7])
     .range([0, 500]);
 
-var xAxis = d3.svg.axis()
+var xAxis = d3.axisBottom()
     .scale(xScale)
-    .orient("bottom")
     .tickSize(13)
     .tickFormat(d3.format("0.0f"));
 
@@ -71,8 +93,9 @@ var svg = d3.select("body")
       .append("svg")
       .attr("width", width)
       .attr("height", height)
+      .attr("style", "display:block;margin:auto");
 
-var graticule = d3.geo.graticule()
+var graticule = d3.geoGraticule()
     .extent([[-98 - 45, 38 - 45], [-98 + 45, 38 + 45]])
     .step([5, 5]);
 
@@ -81,71 +104,135 @@ svg.append("rect")
     .datum(graticule)
     .attr("class", "background")
     .attr("width", width)
-    .attr("height", height)
+    .attr("height", height);
    // .on("click", clicked);
 
 //declare g as our appended svg
 var g = svg.append("g");
 
-var defaultFill = "#aaa";
+var defaultFill = "#f00";
 
-d3.json("nielsentopo.json", function(error, dma) {
+var color = d3.scaleLinear()
+		.domain([0, 1])
+		.range(['white', 'red']);
 
-  var nielsen = dma.objects.nielsen_dma.geometries;
+var q = d3.queue().defer(d3.json, "nielsentopo.json")
+	.defer(d3.json, "tv.json")
+	.defer(d3.csv, "sinclair_stations.csv");
+	
+var slider = d3.select("#slider");
 
+var transition = d3.transition().duration(1000);
+	
+q.await(function(error, dma, tv, sinclair) {
+		var nielsen = dma.objects.nielsen_dma.geometries;
+		
+		var dmag = g.append("g")
+				.attr("id", "dmas");
+		g.append("path", ".graticule")
+				.datum(topojson.mesh(dma, dma.objects.nielsen_dma, function(a, b) { 
+					return true;
+				}))
+				.attr("id", "dma-borders")
+				.attr("d", path);
+		
   // adding data from tv json (number of TVs, etc) to map json
-  d3.json("tv.json", function(error, tv){
-    for (var i = 0; i < nielsen.length; i++){
-      var dma_code = nielsen[i].id;
-      for (key in tv[dma_code]){
-        nielsen[i].properties[key] = tv[dma_code][key];
-      }
-    }
-  dma.objects.nielsen_dma.geometries = nielsen;
-
-  g.append("g")
-    .attr("id", "dmas")
-    .selectAll("path")
-    .data(topojson.feature(dma, dma.objects.nielsen_dma).features)
-    .enter()
-    .append("path")
-    .attr("d", path)
-    //.on("click", clicked)
+		for (var i = 0; i < nielsen.length; i++){
+			var dma_code = nielsen[i].id;
+			for (key in tv[dma_code]){
+			nielsen[i].properties[key] = tv[dma_code][key];
+			}
+		}
+		
+		var extent = d3.extent(sinclair.filter(d => parseInt(d.start_year) > 1000), d=>parseInt(d.start_year));
+		slider.attr("min", extent[0])
+				.attr("max", extent[1])
+				.on('input', function (evt){
+					console.log(this.value);
+					update(this.value);
+					});
+		
+		
+		function update(year){
+			var amounts = d3.nest()
+					.key(d => d.dma_code)
+					.rollup(function(d) {
+						return {
+							num_sinclair : d3.sum(d.filter(g=>+g.sinclair_owned==1 && +g.start_year<=year), g=>parseInt(g.sinclair_owned)),
+							tot_stations : d.length,
+							station_names : d.map(g=>g.station_name),
+							sinclair_stations: d.filter(g=>g.sinclair_owned=="1").map(g=>g.station_name + " (" + g.start_year + ")")
+						}
+					})
+					.entries(sinclair);
+			//console.log(amounts);
+			for (var i = 0; i< nielsen.length; i++){
+			
+				var a = amounts.find(x=> x.key == nielsen[i].id);
+				nielsen[i].properties["num_sinclair"] = a.value.num_sinclair;
+				nielsen[i].properties["tot_stations"] = a.value.tot_stations;
+				nielsen[i].properties["station_names"] = a.value.station_names;
+				nielsen[i].properties["sinclair_stations"] = a.value.sinclair_stations;
+			}
+			//console.log(nielsen);
+			dma.objects.nielsen_dma.geometries = nielsen;
+			
+			d3.select("#header").
+				html("<text><p>Year: " + year + "</p><p>Total stations: " + d3.sum(amounts, d=>d.value.num_sinclair) + "</p>"
+				+ "<p>Potential reach: " + numberWithCommas(d3.sum(nielsen, d=> d.properties.num_sinclair>0?d.properties["TV Homes"]:0)) +"</p><p>\"Average\" reach: " + numberWithCommas(Math.floor(d3.sum(nielsen, d=> d.properties.num_sinclair>0?d.properties.num_sinclair*(d.properties["TV Homes"]/d.properties.tot_stations):0))) + "</p></text>");
+			var dmj = dmag.selectAll("path")
+				.data(topojson.feature(dma, dma.objects.nielsen_dma).features, d=>d.properties.dma);
+			dmj.enter()
+				.append("path")
+				.attr("d", path)
+				//.on("click", clicked)
     
-    .on("mouseover", function(d){
-      d3.select(this)
-      .attr("fill", "orange");
+				.on("mouseover", function(d){
+					d3.select(this)
+					.attr("fill", "orange")
+					.attr("opacity", .9);
 
-      var prop = d.properties;
+					var prop = d.properties;
 
-      var string = "<p><strong>Market Area Name</strong>: " + prop.dma1 + "</p>";
-      string += "<p><strong>Homes with TVs</strong>: " + numberWithCommas(prop["TV Homes"]) + "</p>";
-      string += "<p><strong>% with Cable</strong>: " + prop.cableperc + "%</p>";
-      string += "<p><strong>Nielsen Rank</strong>: " + prop.Rank + "</p>";
+					var string = "<p><strong>Market Area Name</strong>: " + prop.dma1 + "</p>";
+					string += "<p><strong>Homes with TVs</strong>: " + numberWithCommas(prop["TV Homes"]) + "</p>";
+					string += "<p><strong>% with Cable</strong>: " + prop.cableperc + "%</p>";
+					string += "<p><strong>Nielsen Rank</strong>: " + prop.Rank + "</p>";
+					string += "<p>Number of sinclair stations: " + prop.num_sinclair + "</p>";
+					string += "<p>Total number of stations: " + prop.tot_stations + "</p>";
+					string += "<p>Station names: " + prop.station_names + "</p>";
+					string += "<p>Sinclair owned stations: " + prop.sinclair_stations + "</p>";
 
-      d3.select("#textbox")
-        .html("")
-        .append("text")
-        .html(string)
-    })
+					d3.select("#textbox")
+						.html("")
+						.append("text")
+						.html(string)
+				})
 
-    .on("mouseout", function(d){
-      d3.select(this)
-      .attr("fill", defaultFill)
-    })
-    
-    .attr("opacity", 0.9)
-    .attr("fill", defaultFill);
+				.on("mouseout", function(d){
+					d3.select(this)
+					.attr("fill", defaultFill)
+					.attr("opacity", d.properties.num_sinclair / d.properties.tot_stations);
+				})
+		
+				.attr("opacity", function(d){
+					return (d.properties.num_sinclair / d.properties.tot_stations);
+					})
+				.attr("fill", defaultFill);
 
-  // add dma borders
-  g.append("path", ".graticule")
-      .datum(topojson.mesh(dma, dma.objects.nielsen_dma, function(a, b) { 
-        return true;
-      }))
-      .attr("id", "dma-borders")
-      .attr("d", path);
-  })
-})
+				// add dma borders
+			dmj.transition().attr("opacity", function(d){
+					return (d.properties.num_sinclair / d.properties.tot_stations);
+					});
+		}
+		update(extent[0]);
+		
+		
+		
+		
+		
+		
+	});
 
 // via http://stackoverflow.com/a/2901298
 function numberWithCommas(x) {

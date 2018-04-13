@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title>US Map of Nielsen Media Markets</title>
+<title>Sinclair Stations over time</title>
 <style>
 .background {
   fill: none;
@@ -56,14 +56,25 @@
 	font-size: 24px;
 	margin:0;
 }
+#tribunetext {
+	position:absolute;
+	top:	130px;
+	left:	50px;
+	font-family: Arial, Helvetica;
+	font-size:	24px;
+}
+
 
 </style>
 </head>
 <body>
 <div id="textbox"></div>
-<div id="header"></div>
+<div id="header">
+<text><p>Year: <a id="year"></a></p>
+<p>Number of stations: <a id="numstations">0</a></p></text></div>
 </br></br></br></br>
 <input id="slider" type="range" style="margin:auto" step="1">
+<a id="tribunetext" style="margin:auto;left:50px">With Tribune Merger: <input id="tribunebox" type="checkbox"></a>
 <script src="http://d3js.org/d3.v5.js"></script>
 <script src="https://d3js.org/d3-queue.v3.min.js"></script>
 <script src="https://d3js.org/d3-request.v1.min.js"></script>
@@ -98,13 +109,14 @@ var svg = d3.select("body")
 var graticule = d3.geoGraticule()
     .extent([[-98 - 45, 38 - 45], [-98 + 45, 38 + 45]])
     .step([5, 5]);
-
+console.log(graticule);
 // adding a blank background
-svg.append("rect")
+svg.append("path")
     .datum(graticule)
     .attr("class", "background")
     .attr("width", width)
-    .attr("height", height);
+    .attr("height", height)
+	.attr("d", path);
    // .on("click", clicked);
 
 //declare g as our appended svg
@@ -118,13 +130,19 @@ var color = d3.scaleLinear()
 
 var q = d3.queue().defer(d3.json, "nielsentopo.json")
 	.defer(d3.json, "tv.json")
-	.defer(d3.csv, "sinclair_stations.csv");
+	.defer(d3.csv, "sinclair_stations.csv")
+	.defer(d3.csv, "tribune_stations.csv");
 	
 var slider = d3.select("#slider");
+var checkbox = d3.select("#tribunebox");
+
+var year = d3.select("#year");
+
+var num_stations = d3.select("#numstations");
 
 var transition = d3.transition().duration(1000);
 	
-q.await(function(error, dma, tv, sinclair) {
+q.await(function(error, dma, tv, sinclair, tribune) {
 		var nielsen = dma.objects.nielsen_dma.geometries;
 		
 		var dmag = g.append("g")
@@ -135,7 +153,7 @@ q.await(function(error, dma, tv, sinclair) {
 				}))
 				.attr("id", "dma-borders")
 				.attr("d", path);
-		
+
   // adding data from tv json (number of TVs, etc) to map json
 		for (var i = 0; i < nielsen.length; i++){
 			var dma_code = nielsen[i].id;
@@ -152,9 +170,12 @@ q.await(function(error, dma, tv, sinclair) {
 					update(this.value);
 					});
 		
+		var tjs = topojson.feature(dma, dma.objects.nielsen_dma).features;
+		
+		var only_sinclair = sinclair.filter(d => d.sinclair_owned == "1");
 		
 		function update(year){
-			var amounts = d3.nest()
+			/*var amounts = d3.nest()
 					.key(d => d.dma_code)
 					.rollup(function(d) {
 						return {
@@ -175,59 +196,63 @@ q.await(function(error, dma, tv, sinclair) {
 				nielsen[i].properties["sinclair_stations"] = a.value.sinclair_stations;
 			}
 			//console.log(nielsen);
-			dma.objects.nielsen_dma.geometries = nielsen;
+			dma.objects.nielsen_dma.geometries = nielsen;*/
 			
-			d3.select("#header").
-				html("<text><p>Year: " + year + "</p><p>Total stations: " + d3.sum(amounts, d=>d.value.num_sinclair) + "</p>"
-				+ "<p>Potential reach: " + numberWithCommas(d3.sum(nielsen, d=> d.properties.num_sinclair>0?d.properties["TV Homes"]:0)) +"</p><p>\"Average\" reach: " + numberWithCommas(Math.floor(d3.sum(nielsen, d=> d.properties.num_sinclair>0?d.properties.num_sinclair*(d.properties["TV Homes"]/d.properties.tot_stations):0))) + "</p></text>");
+			d3.select("#year").html(year);
+			
+			/*d3.select("#header")
+				html("<text><p>Year: " + year + "</p>");/*<p>Total stations: " + d3.sum(amounts, d=>d.value.num_sinclair) + "</p>"
+				+ "<p>Potential reach: " + numberWithCommas(d3.sum(nielsen, d=> d.properties.num_sinclair>0?d.properties["TV Homes"]:0))
+				+"</p><p>\"Average\" reach: " + numberWithCommas(Math.floor(d3.sum(nielsen, d=> d.properties.num_sinclair>0?d.properties.num_sinclair*(d.properties["TV Homes"]/d.properties.tot_stations):0))) + "</p></text>");*/
 			var dmj = dmag.selectAll("path")
-				.data(topojson.feature(dma, dma.objects.nielsen_dma).features, d=>d.properties.dma);
+				.data(only_sinclair.filter(g => +g.start_year <= year), d => d.station_name);
 			dmj.enter()
 				.append("path")
-				.attr("d", path)
-				//.on("click", clicked)
-    
-				.on("mouseover", function(d){
-					d3.select(this)
-					.attr("fill", "orange")
-					.attr("opacity", .9);
-
-					var prop = d.properties;
-
-					var string = "<p><strong>Market Area Name</strong>: " + prop.dma1 + "</p>";
-					string += "<p><strong>Homes with TVs</strong>: " + numberWithCommas(prop["TV Homes"]) + "</p>";
-					string += "<p><strong>% with Cable</strong>: " + prop.cableperc + "%</p>";
-					string += "<p><strong>Nielsen Rank</strong>: " + prop.Rank + "</p>";
-					string += "<p>Number of sinclair stations: " + prop.num_sinclair + "</p>";
-					string += "<p>Total number of stations: " + prop.tot_stations + "</p>";
-					string += "<p>Station names: " + prop.station_names + "</p>";
-					string += "<p>Sinclair owned stations: " + prop.sinclair_stations + "</p>";
-
-					d3.select("#textbox")
-						.html("")
-						.append("text")
-						.html(string)
+				.attr("d", function(d) {
+					//console.log(d.dma_code);
+					var a = tjs.find(g => parseInt(g.properties.dma) == parseInt(d.dma_code));
+					//console.log(a);
+					return path(a);
 				})
-
-				.on("mouseout", function(d){
-					d3.select(this)
-					.attr("fill", defaultFill)
-					.attr("opacity", d.properties.num_sinclair / d.properties.tot_stations);
-				})
-		
-				.attr("opacity", function(d){
-					return (d.properties.num_sinclair / d.properties.tot_stations);
-					})
-				.attr("fill", defaultFill);
+				.attr("fill", defaultFill)
+				.attr("opacity", 1e-6)
+				.transition()
+				.attr("opacity", .1);
 
 				// add dma borders
-			dmj.transition().attr("opacity", function(d){
-					return (d.properties.num_sinclair / d.properties.tot_stations);
-					});
+			dmj.exit()
+				.transition()
+				.attr("opacity", 1e-6).remove();
+			num_stations.html(dmj.enter().size() + dmj.size());
 		}
 		update(extent[0]);
 		
+		var tribg = g.append("g")
+			.attr("id", "tribune");
 		
+		checkbox.on("change", function(){
+			if (this.checked){
+				tribg.selectAll("path")
+					.data(tribune)
+					.enter()
+					.append("path")
+					.attr("d", function(d) {
+						return path(tjs.find(g=> +g.properties.dma == +d.dma_code));
+					})
+					.attr("fill", "#00f")
+					.attr("opacity", 1e-6)
+					.transition()
+					.attr("opacity", .1);
+			}
+			else{
+				tribg.selectAll("path")
+					.data([])
+					.exit()
+					.transition()
+					.attr("opacity", 1e-6)
+					.remove();
+			}
+		});
 		
 		
 		

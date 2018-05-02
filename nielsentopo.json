@@ -6901,6 +6901,32 @@
           }
         },
         {
+          "type": "Polygon",
+          "arcs": [
+            [
+              -574,
+              1864,
+              1865,
+              1866,
+              1867,
+              -1042,
+              1868,
+              -315
+            ]
+          ],
+          "id": 538,
+          "properties": {
+            "name": "dma:",
+            "latitude": 42.9137715,
+            "tvperc": 87.6,
+            "dma": 538,
+            "dma1": "Rochester, MN-Mason City, IA-Austin, MN",
+            "cableperc": 69.5,
+            "adsperc": 18.6,
+            "longitude": -77.387152
+          }
+        },
+        {
           "type": "MultiPolygon",
           "arcs": [
             [
@@ -6927,32 +6953,6 @@
               [
                 1863
               ]
-            ]
-          ],
-          "id": 538,
-          "properties": {
-            "name": "dma:",
-            "latitude": 42.9137715,
-            "tvperc": 87.6,
-            "dma": 538,
-            "dma1": "Rochester, MN-Mason City, IA-Austin, MN",
-            "cableperc": 69.5,
-            "adsperc": 18.6,
-            "longitude": -77.387152
-          }
-        },
-        {
-          "type": "Polygon",
-          "arcs": [
-            [
-              -574,
-              1864,
-              1865,
-              1866,
-              1867,
-              -1042,
-              1868,
-              -315
             ]
           ],
           "id": 611,

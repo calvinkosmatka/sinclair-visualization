@@ -1,15 +1,19 @@
-This is the map of Nielen [Designated Marketing Areas](http://en.wikipedia.org/wiki/Media_market) using D3.js. Hover over for data related to each area. 
+[View here](https://calvinkosmatka.github.io/sinclair-visualization/)
 
-See map [here](http://bl.ocks.org/simzou/6459889)
+This is a work in progress.
 
-See code [here](https://github.com/simzou/nielsen-dma/)
+master branch is my original Sinclair-only visualization
 
-###Credits
+tribune-merger branch includes Tribune data
 
-* Map adapted from Mike Bostock's [map example](http://bl.ocks.org/mbostock/2206590)
-* Topojson made by converting shapefile from [here](http://geocommons.com/overlays/306767) to topojson via [Mike Bostock's instructions](http://bost.ocks.org/mike/map/)
-* Nielsen rank and TV data via [tvb](http://www.tvb.org/media/file/TVB_Market_Profiles_Nielsen_Household_DMA_Ranks2.pdf)
+gh-pages mirrors the tribune-merger branch
 
-###Notes
+This is my first data visualization project. I started with [Simon Zou's Nielsen DMA map](https://github.com/simzou/nielsen-dma) as a base, since it was a readily available map of Nielsen regions. Then I wrote a [script](https://github.com/calvinkosmatka/table_scraper) to scrape Wikipedia's pages for Sinclair and Tribune owned/operated TV stations.
 
-* Some areas are shaped really strangely (such as a slice of Nevada being part of the Denver media market) but that is really how they are divided 
+There are still a few janitorial issues with this data: 
+* Some of the stations have a footnote reference number in place of the year they were acquired. These stations always show up on the map and are always included in the count.
+* At least a few Sinclair-owned stations are missing, such as those in Corpus Christi, TX.
+
+[Sinclair data](https://en.wikipedia.org/wiki/List_of_staions_owned_or_operated_by_Sinclair_Broadcast_Group) retrieved on 3/25/18. 
+
+[Tribune data](https://en.wikipedia.org/wiki/Tribune_Broadcasting) retrieved on 4/11/18.
